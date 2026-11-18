@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="从种子综述构建研究分类、进展时间线和研究计划。">
+  <meta name="theme-color" content="#f6f7f5">
+  <title>研究图谱 · Research Atlas</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="data.js"></script>
+  <script defer src="model.js"></script>
+  <script defer src="editor.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到内容</a>
+  <div class="shell">
+    <aside class="rail">
+      <a class="brand" href="#overview" aria-label="研究图谱首页"><span class="brand-mark" aria-hidden="true">✳</span><span><strong>研究图谱</strong><small>Research Atlas</small></span></a>
+      <nav id="navigation" class="navigation" aria-label="项目视图">
+        <a href="#overview" data-view="overview"><span aria-hidden="true">◫</span>分类与进展</a>
+        <a href="#reviews" data-view="reviews"><span aria-hidden="true">▤</span>文献与分类</a>
+        <a href="#timeline" data-view="timeline"><span aria-hidden="true">◷</span>进展时间线</a>
+        <a href="#plans" data-view="plans"><span aria-hidden="true">◇</span>研究计划</a>
+      </nav>
+      <div class="rail-status"><span class="status-dot" aria-hidden="true"></span><span id="storage-status">项目保存在此浏览器</span></div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar">
+        <span class="topbar-label">研究工作台</span>
+        <div class="topbar-actions">
+          <details class="project-menu" id="project-menu">
+            <summary class="button">项目 <span aria-hidden="true">⌄</span></summary>
+            <div class="menu-panel">
+              <button type="button" data-action="new">新建空白项目</button>
+              <button type="button" data-action="import">导入 JSON</button>
+              <button type="button" data-action="export">导出 JSON</button>
+              <button type="button" data-action="demo">载入示例项目</button>
+            </div>
+          </details>
+          <button type="button" class="button primary" data-edit="project">编辑项目</button>
+        </div>
+      </header>
+      <main id="main" tabindex="-1">
+        <div id="project-header"></div>
+        <section id="view" aria-label="当前项目视图"></section>
+      </main>
+    </div>
+  </div>
+  <input id="project-import" type="file" accept=".json,application/json" hidden>
+  <dialog id="project-editor" aria-label="编辑研究项目"></dialog>
+  <dialog id="replace-dialog" aria-labelledby="replace-title">
+    <form method="dialog" class="confirm-body">
+      <h2 id="replace-title">替换当前项目</h2>
+      <p id="replace-message"></p>
+      <div class="confirm-actions">
+        <button type="submit" value="cancel" class="button" autofocus>取消</button>
+        <button type="button" class="button" data-action="export">导出当前项目</button>
+        <button type="submit" value="replace" class="button primary">确认替换</button>
+      </div>
+    </form>
+  </dialog>
+  <div id="announcement" class="toast" role="status" aria-live="polite"></div>
+  <noscript><p class="noscript">启用 JavaScript 后即可使用研究图谱。</p></noscript>
+</body>
+</html>
