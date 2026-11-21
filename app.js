@@ -3,7 +3,8 @@
 
   const model = window.ResearchAtlasModel;
   const storageKey = 'research-atlas/project/v1';
-  const views = ['overview', 'reviews', 'timeline', 'plans'];
+  const views = ['overview', 'reviews', 'periods', 'timeline', 'plans'];
+  const periodWidths = [3, 4, 5];
   const statuses = { idea: '构想', planned: '已计划', active: '进行中', done: '已完成' };
   const palette = ['#267e73', '#4a739a', '#a7723f', '#805b99', '#b15d6b', '#64824f'];
   const evidenceFields = [
@@ -19,6 +20,8 @@
   let toastTimeout;
   let pendingReplacement;
   let categoryFilter = '';
+  let periodCategory = '';
+  let periodWidth = 3;
   let evidenceFilter = null;
   let openBranches = null;
   let evidenceToFocus = false;
@@ -69,6 +72,7 @@
     }
     project = next;
     if (!project.categories.some(category => category.id === categoryFilter)) categoryFilter = '';
+    if (!project.categories.some(category => category.id === periodCategory)) periodCategory = '';
     if (evidenceFilter && !project.categories.some(category => category.id === evidenceFilter)) evidenceFilter = null;
     render();
     return storageAvailable;
@@ -134,7 +138,7 @@
         <h1>${escape(project.title)}</h1>
         ${project.description ? `<p>${escape(project.description)}</p>` : ''}
       </div>`;
-    layout.innerHTML = { overview, reviews, timeline, plans }[view](index);
+    layout.innerHTML = { overview, reviews, periods, timeline, plans }[view](index);
   }
 
   function emptyState(title, detail, section, action) {
@@ -174,7 +178,7 @@
           <div class="branch-body">
             ${category.description ? `<p class="branch-description">${escape(category.description)}</p>` : ''}
             <div class="branch-actions"><button type="button" class="branch-link" data-evidence-category="${id}">查看分类证据 <span aria-hidden="true">↓</span></button>
-            ${parentWithProgress ? `<a href="#timeline" data-category="${id}">按时间查看 <span aria-hidden="true">↗</span></a>` : ''}</div>
+            ${parentWithProgress ? `<a href="#timeline" data-category="${id}">按时间查看 <span aria-hidden="true">↗</span></a><a href="#periods" data-period-branch="${id}">按阶段比较 <span aria-hidden="true">↗</span></a>` : ''}</div>
             ${children.length ? `<ul class="mind-children">${children.map(child => branches.get(child.id)).join('')}</ul>` : ''}
             ${milestones.length ? `<ul class="mind-milestones" aria-label="${escape(category.name)}的研究进展">${milestones.map(item => mindMilestone(item, index)).join('')}</ul>` : ''}
             ${!children.length && !milestones.length ? '<p class="branch-description">此分类暂无进展记录。</p>' : ''}
@@ -281,6 +285,70 @@
     return a.localeCompare(b, 'en');
   }
 
+  function periods(index) {
+    const selected = index.categories.get(periodCategory);
+    const branches = selected ? index.children.get(selected.id) : index.roots;
+    const rows = branches.map(branch => `<li class="period-branch"><button type="button" class="branch-link" data-period-branch="${escape(branch.id)}">${escape(branch.name)}</button>
+      <p>${escape(branch.description || '待补充研究内容。')}</p></li>`).join('');
+    const branchOverview = selected
+      ? `<div class="period-scope"><h3>${escape(categoryPath(selected, index))}</h3><p>${escape(selected.description || '待补充研究内容。')}</p>
+        <a class="branch-link" href="#overview" data-evidence-category="${escape(selected.id)}">查看分类依据 <span aria-hidden="true">↗</span></a></div>`
+      : `<h3>研究分支</h3><p class="panel-note">已整理 ${index.roots.length} 个一级分支，${index.categories.size - index.roots.length} 个子分类。</p>`;
+    return `<section class="panel period-panel"><div class="panel-heading"><div><h2>综述分期</h2><p>按原始成果年份回顾各分支，比较已有基线与新增进展。</p></div>
+      <div class="inline-actions"><a class="button" href="skills/review-chronology/SKILL.md" download="review-chronology-SKILL.md">下载分析技能</a><button type="button" class="button primary" data-edit="milestones">管理进展</button></div></div>
+      <div class="period-taxonomy">${branchOverview}${rows ? `<ul class="period-branches">${rows}</ul>` : ''}</div>
+      <div class="filters">${categorySelect(index, 'period-category', periodCategory)}<label class="filter">每段年数<select id="period-width">
+        ${periodWidths.map(width => `<option value="${width}" ${periodWidth === width ? 'selected' : ''}>${width} 年</option>`).join('')}
+      </select></label></div>
+      ${periodTimeline(index, selected, branches)}</section>`;
+  }
+
+  function periodTimeline(index, selected, branches) {
+    const records = [...project.milestones].sort((a, b) => dateCompare(a.date, b.date));
+    if (!records.length) return emptyState('暂无分期进展', '记录成果的发表年份，并填写它在原有基础上带来的变化。', 'milestones', '添加进展');
+
+    const firstYear = Number(records[0].date.slice(0, 4));
+    const lastYear = Number(records.at(-1).date.slice(0, 4));
+    const bands = Array.from({ length: Math.floor((lastYear - firstYear) / periodWidth) + 1 }, () => new Map());
+    const scope = selected ? [selected, ...branches] : branches;
+    const branchForCategory = new Map();
+    for (const branch of scope) {
+      for (const categoryId of index.descendants.get(branch.id)) branchForCategory.set(categoryId, branch.id);
+    }
+
+    for (const item of records) {
+      const assigned = new Set(item.categoryIds.map(id => branchForCategory.get(id)).filter(Boolean));
+      if (!selected && !item.categoryIds.length) assigned.add('');
+      const year = Number(item.date.slice(0, 4));
+      const band = bands[Math.floor((year - firstYear) / periodWidth)];
+      for (const branchId of assigned) {
+        if (!band.has(branchId)) band.set(branchId, []);
+        band.get(branchId).push(item);
+      }
+    }
+
+    const groups = [...scope, { id: '', name: '未分类' }];
+    return `<p class="panel-note period-range">从 ${firstYear} 年起每 ${periodWidth} 年一段。项目中最新记录为 ${lastYear} 年。</p>
+      <div class="period-bands">${bands.map((band, offset) => {
+        const start = firstYear + offset * periodWidth;
+        const end = Math.min(9999, start + periodWidth - 1);
+        return `<section class="period-band"><h3>${start}–${end}</h3>
+          ${band.size ? `<div class="period-groups">${groups.filter(branch => band.has(branch.id)).map(branch =>
+            `<section class="period-group"><h4>${escape(branch.name)}</h4><div class="record-list">
+            ${band.get(branch.id).map(item => periodRecord(item, index)).join('')}</div></section>`).join('')}</div>`
+            : '<p class="period-gap">本时段暂无已录入的进展。</p>'}</section>`;
+      }).join('')}</div>`;
+  }
+
+  function periodRecord(item, index) {
+    return `<article class="record period-record"><div class="record-heading"><div><time datetime="${escape(item.date)}">${escape(item.date)}</time><h5>${escape(item.title)}</h5></div>${sourceLink(item.url, '查看原始成果')}</div>
+      ${recordChips(item, index)}<dl class="finding-list">
+        ${item.baseline ? `<div><dt>此前状态</dt><dd>${escape(item.baseline)}</dd></div>` : ''}
+        ${item.description ? `<div><dt>新增进展</dt><dd>${escape(item.description)}</dd></div>` : ''}
+        <div><dt>进展幅度</dt><dd>${escape(item.magnitude || '幅度待判。')}</dd></div>
+      </dl>${item.sourceLocator ? `<p class="period-source">原文位置 ${escape(item.sourceLocator)}</p>` : ''}${evidence(item, index)}</article>`;
+  }
+
   function timeline(index) {
     const records = [...filterByCategory(project.milestones, index)].sort((a, b) =>
       order === 'asc' ? dateCompare(a.date, b.date) : dateCompare(b.date, a.date));
@@ -377,7 +445,7 @@
 
   document.addEventListener('click', event => {
     if (event.defaultPrevented || event.ctrlKey || event.shiftKey || event.metaKey || event.altKey) return;
-    const action = event.target.closest('[data-edit], [data-action], [data-category], [data-review], [data-evidence-category], [data-year], .skip-link');
+    const action = event.target.closest('[data-edit], [data-action], [data-category], [data-review], [data-evidence-category], [data-period-branch], [data-year], .skip-link');
     if (!projectMenu.contains(event.target)) projectMenu.open = false;
     if (!action) return;
     if (action.classList.contains('skip-link')) {
@@ -390,6 +458,13 @@
       event.preventDefault();
       categoryFilter = action.dataset.category;
       navigate('timeline');
+    }
+    if (action.dataset.periodBranch) {
+      event.preventDefault();
+      periodCategory = action.dataset.periodBranch;
+      const alreadyOnPeriods = currentView() === 'periods';
+      navigate('periods');
+      if (alreadyOnPeriods) document.querySelector('#period-category')?.focus({ preventScroll: true });
     }
     if (action.dataset.review) {
       event.preventDefault();
@@ -433,6 +508,8 @@
     }
     if (event.target.id === 'category-filter') categoryFilter = event.target.value;
     else if (event.target.id === 'timeline-order') order = event.target.value;
+    else if (event.target.id === 'period-category') periodCategory = event.target.value;
+    else if (event.target.id === 'period-width' && periodWidths.includes(Number(event.target.value))) periodWidth = Number(event.target.value);
     else return;
     render();
     document.getElementById(event.target.id)?.focus({ preventScroll: true });
@@ -455,6 +532,8 @@
     pendingReplacement = undefined;
     if (replaceDialog.returnValue !== 'replace' || !replacement) return;
     categoryFilter = '';
+    periodCategory = '';
+    periodWidth = 3;
     evidenceFilter = null;
     openBranches = null;
     order = 'desc';

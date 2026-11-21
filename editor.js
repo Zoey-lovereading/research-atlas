@@ -376,7 +376,10 @@
       } else {
         const plan = section === 'plans';
         field('title', plan ? '研究计划标题' : '进展标题', { required: true, wide: true });
-        field('date', plan ? '预计时间' : '进展时间', { required: !plan, placeholder: 'YYYY、YYYY-MM 或 YYYY-MM-DD' });
+        field('date', plan ? '预计时间' : '原始成果时间', {
+          required: !plan, placeholder: 'YYYY、YYYY-MM 或 YYYY-MM-DD',
+          hint: plan ? undefined : '按原始研究成果首次发表或公开的时间填写，综述转述的成果可回查原始文献。可只填年份。',
+        });
         if (plan) {
           field('status', '状态', { type: 'select', choices: Object.entries(statuses), required: true, value: item.status || 'idea' });
           field('deliverable', '预期交付成果', { wide: true });
@@ -384,6 +387,20 @@
           field('url', '研究成果链接', { type: 'url', placeholder: 'https://doi.org/…' });
         }
         field('description', plan ? '研究问题与实施思路' : '研究发现与意义', { type: 'textarea', wide: true });
+        if (!plan) {
+          field('baseline', '此前状态（可选）', {
+            type: 'textarea',
+            hint: '描述这项成果之前的方法、能力或认识，保留原文中的比较对象。未知可留空。',
+          });
+          field('magnitude', '进展幅度（可选）', {
+            type: 'textarea',
+            hint: '有原文依据且条件可比时记录量化变化，注明单位和条件。定性成果可写具体改变。未知可留空。',
+          });
+          field('sourceLocator', '原文位置（可选）', {
+            type: 'textarea', wide: true,
+            hint: '记录成果出处的章节、页码或图表编号。由综述追溯时可同时记录综述位置与被引原始文献。',
+          });
+        }
         references('categoryIds', '关联分类', categoryOptions);
         references('reviewIds', '关联文献', reviewOptions);
       }
